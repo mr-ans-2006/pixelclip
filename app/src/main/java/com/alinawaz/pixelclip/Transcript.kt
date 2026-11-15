@@ -64,7 +64,7 @@ object Transcript {
                 continue
             }
             // Drop leading lines that repeat the previous cue (rolling captions).
-            var fresh = textLines
+            var fresh: List<String> = textLines
             while (fresh.isNotEmpty() && prevLines.contains(fresh.first())) {
                 fresh = fresh.drop(1)
             }
