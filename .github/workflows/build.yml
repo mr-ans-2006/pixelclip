@@ -1,0 +1,60 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Download pixel fonts
+        run: |
+          mkdir -p app/src/main/res/font
+          curl -sL -o app/src/main/res/font/press_start_2p.ttf https://github.com/google/fonts/raw/main/ofl/pressstart2p/PressStart2P-Regular.ttf
+          curl -sL -o app/src/main/res/font/vt323.ttf https://github.com/google/fonts/raw/main/ofl/vt323/VT323-Regular.ttf
+          ls -la app/src/main/res/font
+
+      - name: Generate launcher icons
+        run: |
+          pip install --quiet pillow
+          base64 -d app-icon.b64 > /tmp/icon.webp
+          python3 make_icons.py /tmp/icon.webp
+
+      - name: Decode signing keystore
+        run: |
+          base64 -d keystore.b64 > "$RUNNER_TEMP/pixelclip.keystore"
+          echo "PIXELCLIP_KEYSTORE=$RUNNER_TEMP/pixelclip.keystore" >> "$GITHUB_ENV"
+
+      - name: Build debug APK
+        run: gradle assembleDebug --console=plain
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixelClip-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish APK to release v1.0
+        run: |
+          gh release delete v1.0 --yes || true
+          gh release create v1.0 app/build/outputs/apk/debug/app-debug.apk --title "PixelClip v1.0" --notes "PixelClip v1.0 - AI YouTube clipper. Paste a long YouTube link, pick a mode (Funny / Study / Motivational / Viral), and PixelClip finds the best parts from the captions with Gemini (your own free API key) and cuts them into vertical 1080x1920 clips in Movies > PixelClip, each with a .srt caption file. Needs English captions on the video. No ads."
+        env:
+          GH_TOKEN: ${{ github.token }}
