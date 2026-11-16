@@ -52,9 +52,9 @@ jobs:
           name: PixelClip-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Publish APK to release v1.0
+      - name: Publish APK to release v1.1
         run: |
-          gh release delete v1.0 --yes || true
-          gh release create v1.0 app/build/outputs/apk/debug/app-debug.apk --title "PixelClip v1.0" --notes "PixelClip v1.0 - AI YouTube clipper. Paste a long YouTube link, pick a mode (Funny / Study / Motivational / Viral), and PixelClip finds the best parts from the captions with Gemini (your own free API key) and cuts them into vertical 1080x1920 clips in Movies > PixelClip, each with a .srt caption file. Needs English captions on the video. No ads."
+          gh release delete v1.1 --yes || true
+          gh release create v1.1 app/build/outputs/apk/debug/app-debug.apk --title "PixelClip v1.1" --notes "PixelClip v1.1 - AI YouTube clipper. Paste a long YouTube link, pick a mode (Funny / Study / Motivational / Viral), and PixelClip finds the best parts from the captions with Gemini (your own free API key) and cuts them into vertical 1080x1920 clips in Movies > PixelClip, each with a .srt caption file. Needs English captions on the video. No ads. Includes the subtitle HTTP 429 caption fix."
         env:
           GH_TOKEN: ${{ github.token }}
