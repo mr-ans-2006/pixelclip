@@ -11,6 +11,7 @@ import androidx.core.content.FileProvider
 import com.farimarwat.commons.UpdateChannel
 import com.farimarwat.commons.YoutubeDLRequest
 import com.farimarwat.library.YoutubeDL
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import kotlin.coroutines.resume
@@ -109,8 +110,41 @@ object Engine {
      * Downloads ONLY the subtitles (manual or auto-generated, English) as a VTT
      * file into the cache. No video data is downloaded. Throws
      * [NoCaptionsException] when the video has no English captions at all.
+     *
+     * v1.1: asks yt-dlp for just "en" + "en-orig" instead of the old "en.*"
+     * wildcard (the wildcard made yt-dlp request many English caption tracks
+     * at once and YouTube rate-limited the burst with HTTP 429). Also pauses
+     * between subtitle requests, and if YouTube still answers 429, waits 15s
+     * and retries once before showing a friendly error.
      */
-    suspend fun downloadSubtitles(context: Context, url: String): File =
+    suspend fun downloadSubtitles(context: Context, url: String): File {
+        try {
+            return downloadSubtitlesOnce(context, url)
+        } catch (e: Exception) {
+            if (e is NoCaptionsException) throw e
+            if (!isRateLimitError(e)) throw e
+            delay(15_000)
+            try {
+                return downloadSubtitlesOnce(context, url)
+            } catch (e2: Exception) {
+                if (e2 is NoCaptionsException) throw e2
+                if (isRateLimitError(e2)) {
+                    throw IllegalStateException(
+                        "YouTube is limiting caption downloads right now (429). " +
+                            "Wait 2-3 minutes and try again."
+                    )
+                }
+                throw e2
+            }
+        }
+    }
+
+    private fun isRateLimitError(e: Exception): Boolean {
+        val msg = e.message ?: return false
+        return msg.contains("429") || msg.contains("Too Many Requests", ignoreCase = true)
+    }
+
+    private suspend fun downloadSubtitlesOnce(context: Context, url: String): File =
         suspendCancellableCoroutine { cont ->
             if (!ready) {
                 cont.resumeWithException(
@@ -124,7 +158,8 @@ object Engine {
             req.addOption("--skip-download")
             req.addOption("--write-subs")
             req.addOption("--write-auto-subs")
-            req.addOption("--sub-langs", "en.*")
+            req.addOption("--sub-langs", "en,en-orig")
+            req.addOption("--sleep-subtitles", "2")
             req.addOption("--sub-format", "vtt")
             req.addOption("--no-playlist")
             req.addOption("--no-warnings")
